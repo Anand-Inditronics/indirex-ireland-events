@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Table,
   TableHeader,
@@ -40,7 +41,6 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronDown, Filter, Calendar as CalendarIcon, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -58,9 +58,21 @@ type DetectionType = (typeof DETECTION_TYPES)[number];
 
 interface EventFilters {
   deviceId: string;
-  date: Date | undefined;
+  date: string;
   startTime: string;
   endTime: string;
+  detectionTypes: DetectionType[];
+}
+
+interface MeterEventsTableProps {
+  data: MeterEvent[];
+  initialFilters: {
+    deviceId: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+    detectionTypes: string[];
+  };
 }
 
 function epochToDateTime(ts: number): string {
@@ -77,64 +89,6 @@ function epochToDateTime(ts: number): string {
   const seconds = pad(d.getSeconds());
 
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-}
-
-function hasDataForTypes(ev: MeterEvent, types: DetectionType[]): boolean {
-  if (!types.length) return true;
-  return types.some((t) => ev.detections[t]?.length > 0);
-}
-
-function matchesEventFilters(
-  event: MeterEvent,
-  filters: EventFilters
-): boolean {
-  // Filter by device ID
-  if (
-    filters.deviceId &&
-    !event.deviceId.toLowerCase().includes(filters.deviceId.toLowerCase())
-  ) {
-    return false;
-  }
-
-  // Filter by date and time
-  if (filters.date || filters.startTime || filters.endTime) {
-    const eventDate = new Date(
-      event.timestamp < 1_000_000_000_000
-        ? event.timestamp * 1000
-        : event.timestamp
-    );
-
-    // Check date match
-    if (filters.date) {
-      const filterDate = new Date(filters.date);
-      if (
-        eventDate.getFullYear() !== filterDate.getFullYear() ||
-        eventDate.getMonth() !== filterDate.getMonth() ||
-        eventDate.getDate() !== filterDate.getDate()
-      ) {
-        return false;
-      }
-    }
-
-    // Check time range
-    if (filters.startTime || filters.endTime) {
-      const eventTime = eventDate.getHours() * 60 + eventDate.getMinutes();
-
-      if (filters.startTime) {
-        const [startHour, startMin] = filters.startTime.split(":").map(Number);
-        const startTimeMin = startHour * 60 + startMin;
-        if (eventTime < startTimeMin) return false;
-      }
-
-      if (filters.endTime) {
-        const [endHour, endMin] = filters.endTime.split(":").map(Number);
-        const endTimeMin = endHour * 60 + endMin;
-        if (eventTime > endTimeMin) return false;
-      }
-    }
-  }
-
-  return true;
 }
 
 function renderAllDetectionItems(arr: any[]): React.ReactNode {
@@ -294,46 +248,92 @@ function DetectionCell({ data, title }: { data: any[]; title: string }) {
   );
 }
 
-export default function MeterEventsTable({ data }: { data: MeterEvent[] }) {
-  const [selectedTypes, setSelectedTypes] = useState<DetectionType[]>([]);
-  const [eventFilters, setEventFilters] = useState<EventFilters>({
-    deviceId: "",
-    date: undefined,
-    startTime: "",
-    endTime: "",
+export default function MeterEventsTable({
+  data,
+  initialFilters,
+}: MeterEventsTableProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [selectedTypes, setSelectedTypes] = useState<DetectionType[]>(
+    initialFilters.detectionTypes as DetectionType[]
+  );
+  const [tempFilters, setTempFilters] = useState<EventFilters>({
+    deviceId: initialFilters.deviceId,
+    date: initialFilters.date,
+    startTime: initialFilters.startTime,
+    endTime: initialFilters.endTime,
+    detectionTypes: initialFilters.detectionTypes as DetectionType[],
   });
-  const [tempFilters, setTempFilters] = useState<EventFilters>(eventFilters);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
 
-  const filteredData = useMemo(() => {
-    let filtered = data;
+  const hasActiveFilters =
+    initialFilters.deviceId ||
+    initialFilters.date ||
+    initialFilters.startTime ||
+    initialFilters.endTime;
 
-    // Apply detection type filter
-    if (selectedTypes.length > 0) {
-      filtered = filtered.filter((ev) => hasDataForTypes(ev, selectedTypes));
+  const updateURL = (filters: EventFilters) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    // Reset to page 1 when filters change
+    params.set("page", "1");
+
+    if (filters.deviceId) {
+      params.set("deviceId", filters.deviceId);
+    } else {
+      params.delete("deviceId");
     }
 
-    // Apply event filters
-    filtered = filtered.filter((ev) => matchesEventFilters(ev, eventFilters));
+    if (filters.date) {
+      params.set("date", filters.date);
+    } else {
+      params.delete("date");
+    }
 
-    return filtered;
-  }, [data, selectedTypes, eventFilters]);
+    if (filters.startTime) {
+      params.set("startTime", filters.startTime);
+    } else {
+      params.delete("startTime");
+    }
 
-  const hasActiveFilters =
-    eventFilters.deviceId ||
-    eventFilters.date ||
-    eventFilters.startTime ||
-    eventFilters.endTime;
+    if (filters.endTime) {
+      params.set("endTime", filters.endTime);
+    } else {
+      params.delete("endTime");
+    }
+
+    if (filters.detectionTypes.length > 0) {
+      params.set("detectionTypes", filters.detectionTypes.join(","));
+    } else {
+      params.delete("detectionTypes");
+    }
+
+    router.push(`?${params.toString()}`);
+  };
 
   const applyFilters = () => {
-    setEventFilters(tempFilters);
+    updateURL(tempFilters);
     setFilterDialogOpen(false);
   };
 
   const clearFilters = () => {
-    const empty = { deviceId: "", date: undefined, startTime: "", endTime: "" };
+    const empty: EventFilters = {
+      deviceId: "",
+      date: "",
+      startTime: "",
+      endTime: "",
+      detectionTypes: [],
+    };
     setTempFilters(empty);
-    setEventFilters(empty);
+    setSelectedTypes([]);
+    updateURL(empty);
+  };
+
+  const handleDetectionTypeChange = (types: DetectionType[]) => {
+    setSelectedTypes(types);
+    const newFilters = { ...tempFilters, detectionTypes: types };
+    updateURL(newFilters);
   };
 
   if (!data.length) {
@@ -346,7 +346,7 @@ export default function MeterEventsTable({ data }: { data: MeterEvent[] }) {
       <div className="flex items-center gap-3 flex-wrap">
         <DetectionTypeFilter
           selectedTypes={selectedTypes}
-          onChange={setSelectedTypes}
+          onChange={handleDetectionTypeChange}
         />
 
         <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
@@ -398,7 +398,7 @@ export default function MeterEventsTable({ data }: { data: MeterEvent[] }) {
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {tempFilters.date ? (
-                        format(tempFilters.date, "PPP")
+                        format(new Date(tempFilters.date), "PPP")
                       ) : (
                         <span>Pick a date</span>
                       )}
@@ -407,9 +407,16 @@ export default function MeterEventsTable({ data }: { data: MeterEvent[] }) {
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={tempFilters.date}
-                      onSelect={(date:any) =>
-                        setTempFilters({ ...tempFilters, date })
+                      selected={
+                        tempFilters.date
+                          ? new Date(tempFilters.date)
+                          : undefined
+                      }
+                      onSelect={(date: any) =>
+                        setTempFilters({
+                          ...tempFilters,
+                          date: date ? format(date, "yyyy-MM-dd") : "",
+                        })
                       }
                       initialFocus
                     />
@@ -478,105 +485,101 @@ export default function MeterEventsTable({ data }: { data: MeterEvent[] }) {
         )}
       </div>
 
-      {/* Results count */}
-      <div className="text-sm text-gray-600">
-        Showing {filteredData.length} of {data.length} events
-      </div>
+      {/* Results count - now shows actual filtered count from server */}
+      <div className="text-sm text-gray-600">Showing {data.length} events</div>
 
       {/* FULL-WIDTH TABLE */}
-      
-        <Table className="w-full">
-          <TableHeader>
-            <TableRow className="text-sm">
-              <TableHead className="w-[120px]">Device ID</TableHead>
-              <TableHead className="w-[160px]">Timestamp</TableHead>
-              <TableHead className="w-[100px]">Status</TableHead>
-              <TableHead className="w-[180px]">OCR</TableHead>
-              <TableHead className="w-[180px]">Faces</TableHead>
-              <TableHead className="w-[180px]">TV Channel</TableHead>
-              <TableHead className="w-[200px]">Object Detection</TableHead>
-              <TableHead className="w-[220px]">Content Detection</TableHead>
-              <TableHead className="w-[240px]">Image</TableHead>
+      <Table className="w-full">
+        <TableHeader>
+          <TableRow className="text-sm">
+            <TableHead className="w-[120px]">Device ID</TableHead>
+            <TableHead className="w-[160px]">Timestamp</TableHead>
+            <TableHead className="w-[100px]">Status</TableHead>
+            <TableHead className="w-[180px]">OCR</TableHead>
+            <TableHead className="w-[180px]">Faces</TableHead>
+            <TableHead className="w-[180px]">TV Channel</TableHead>
+            <TableHead className="w-[200px]">Object Detection</TableHead>
+            <TableHead className="w-[220px]">Content Detection</TableHead>
+            <TableHead className="w-[240px]">Image</TableHead>
+          </TableRow>
+        </TableHeader>
+
+        <TableBody>
+          {data.map((event, idx) => (
+            <TableRow key={idx} className="text-sm align-top">
+              <TableCell className="pr-4">{event.deviceId}</TableCell>
+              <TableCell className="pr-4 whitespace-nowrap">
+                {epochToDateTime(event.timestamp)}
+              </TableCell>
+              <TableCell className="pr-4">{event.status}</TableCell>
+
+              {/* Detection Columns with Hover Cards */}
+              <TableCell className="pr-4 align-top">
+                <DetectionCell
+                  data={event.detections.OCR}
+                  title="OCR Detection"
+                />
+              </TableCell>
+              <TableCell className="pr-4 align-top">
+                <DetectionCell
+                  data={event.detections.faces}
+                  title="Face Detection"
+                />
+              </TableCell>
+              <TableCell className="pr-4 align-top">
+                <DetectionCell
+                  data={event.detections.tv_channel}
+                  title="TV Channel Detection"
+                />
+              </TableCell>
+              <TableCell className="pr-4 align-top">
+                <DetectionCell
+                  data={event.detections.object_detection}
+                  title="Object Detection"
+                />
+              </TableCell>
+              <TableCell className="pr-4 align-top">
+                <DetectionCell
+                  data={event.detections.content_detection}
+                  title="Content Detection"
+                />
+              </TableCell>
+
+              {/* IMAGE COLUMN */}
+              <TableCell className="pr-4">
+                {event.processedS3Key ? (
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <button className="border rounded overflow-hidden h-26 w-26">
+                        <img
+                          src={event.processedS3Key}
+                          alt="processed"
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl">
+                      <DialogHeader>
+                        <DialogTitle>Processed Image</DialogTitle>
+                      </DialogHeader>
+                      <div className="w-full flex justify-center">
+                        <img
+                          src={event.processedS3Key}
+                          alt="processed-full"
+                          className="max-h-[80vh] w-auto object-contain rounded border"
+                        />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                ) : (
+                  <span className="text-xs text-gray-400">No image</span>
+                )}
+              </TableCell>
             </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {filteredData.map((event, idx) => (
-              <TableRow key={idx} className="text-sm align-top">
-                <TableCell className="pr-4">{event.deviceId}</TableCell>
-                <TableCell className="pr-4 whitespace-nowrap">
-                  {epochToDateTime(event.timestamp)}
-                </TableCell>
-                <TableCell className="pr-4">{event.status}</TableCell>
-
-                {/* Detection Columns with Hover Cards */}
-                <TableCell className="pr-4 align-top">
-                  <DetectionCell
-                    data={event.detections.OCR}
-                    title="OCR Detection"
-                  />
-                </TableCell>
-                <TableCell className="pr-4 align-top">
-                  <DetectionCell
-                    data={event.detections.faces}
-                    title="Face Detection"
-                  />
-                </TableCell>
-                <TableCell className="pr-4 align-top">
-                  <DetectionCell
-                    data={event.detections.tv_channel}
-                    title="TV Channel Detection"
-                  />
-                </TableCell>
-                <TableCell className="pr-4 align-top">
-                  <DetectionCell
-                    data={event.detections.object_detection}
-                    title="Object Detection"
-                  />
-                </TableCell>
-                <TableCell className="pr-4 align-top">
-                  <DetectionCell
-                    data={event.detections.content_detection}
-                    title="Content Detection"
-                  />
-                </TableCell>
-
-                {/* IMAGE COLUMN */}
-                <TableCell className="pr-4">
-                  {event.processedS3Key ? (
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <button className="border rounded overflow-hidden h-26 w-26">
-                          <img
-                            src={event.processedS3Key}
-                            alt="processed"
-                            className="h-full w-full object-cover"
-                          />
-                        </button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl">
-                        <DialogHeader>
-                          <DialogTitle>Processed Image</DialogTitle>
-                        </DialogHeader>
-                        <div className="w-full flex justify-center">
-                          <img
-                            src={event.processedS3Key}
-                            alt="processed-full"
-                            className="max-h-[80vh] w-auto object-contain rounded border"
-                          />
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  ) : (
-                    <span className="text-xs text-gray-400">No image</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
