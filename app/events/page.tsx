@@ -25,30 +25,33 @@ interface PageProps {
 
 export default async function EventsPage({ searchParams }: PageProps) {
   const session = await getServerSession(authOptions);
-  if (!session) {
+  if (!session?.user?.id) {
     redirect("/signin");
   }
 
-  // Next.js 15: searchParams is now a Promise!
+  const userId = session.user.id; // ← this is safe
+
   const params = await searchParams;
   const page = Math.max(1, Number(params.page || "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
 
+  // app/events/page.tsx — CORRECTED VERSION
   const [rowsRes, countRes] = await Promise.all([
     query(
-      `SELECT device_id,
-              timestamp,
-              status,
-              detections,
-              processed_s3_key
-       FROM meter_image_events
-       ORDER BY timestamp DESC
-       LIMIT $1 OFFSET $2`,
-      [PAGE_SIZE, offset]
+      `SELECT device_id, timestamp, status, detections, processed_s3_key
+     FROM meter_image_events
+     -- WHERE user_id = $1          ← commented out
+     ORDER BY timestamp DESC
+     LIMIT $1 OFFSET $2`,
+      [PAGE_SIZE, offset] // ← REMOVED userId from params!
     ),
-    query(`SELECT COUNT(*)::int AS count FROM meter_image_events`),
+    query(
+      `SELECT COUNT(*)::int AS count 
+     FROM meter_image_events
+     -- WHERE user_id = $1`,
+      [] // ← empty array
+    ),
   ]);
-
   const events: MeterEvent[] = rowsRes.rows.map(mapMeterEventRow);
   const total = Number(countRes.rows[0]?.count ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
