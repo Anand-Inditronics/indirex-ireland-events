@@ -8,6 +8,15 @@ import Link from "next/link";
 import { query } from "../../lib/db";
 import { mapMeterEventRow, MeterEvent } from "../../lib/meterEvents";
 import MeterEventsTable from "../../components/ui/MeterEventsTable";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 export const dynamicParams = true;
 export const dynamic = "force-dynamic";
@@ -146,9 +155,12 @@ export default async function EventsPage({ searchParams }: PageProps) {
           endTime: params.endTime || "",
           detectionTypes: detectionTypes,
         }}
+        currentPage={page}
+        totalPages={totalPages}
+        searchParams={params}
       />
 
-      <Pagination
+      <EventsPagination
         currentPage={page}
         totalPages={totalPages}
         searchParams={params}
@@ -157,7 +169,7 @@ export default async function EventsPage({ searchParams }: PageProps) {
   );
 }
 
-function Pagination({
+function EventsPagination({
   currentPage,
   totalPages,
   searchParams,
@@ -183,33 +195,90 @@ function Pagination({
     return `?${params.toString()}`;
   };
 
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages: (number | "ellipsis")[] = [];
+    const showEllipsisStart = currentPage > 3;
+    const showEllipsisEnd = currentPage < totalPages - 2;
+
+    // Always show first page
+    pages.push(1);
+
+    // Show ellipsis or page 2
+    if (showEllipsisStart) {
+      pages.push("ellipsis");
+    } else if (totalPages > 1) {
+      pages.push(2);
+    }
+
+    // Show pages around current page
+    for (
+      let i = Math.max(2, currentPage - 1);
+      i <= Math.min(totalPages - 1, currentPage + 1);
+      i++
+    ) {
+      if (!pages.includes(i)) {
+        pages.push(i);
+      }
+    }
+
+    // Show ellipsis or second-to-last page
+    if (showEllipsisEnd) {
+      pages.push("ellipsis");
+    } else if (totalPages > 2 && !pages.includes(totalPages - 1)) {
+      pages.push(totalPages - 1);
+    }
+
+    // Always show last page
+    if (totalPages > 1 && !pages.includes(totalPages)) {
+      pages.push(totalPages);
+    }
+
+    return pages;
+  };
+
   return (
-    <div className="flex items-center justify-center gap-4 mt-8">
-      <Link
-        href={buildQuery(currentPage - 1)}
-        className={
-          currentPage === 1
-            ? "pointer-events-none opacity-50"
-            : "hover:underline"
-        }
-      >
-        ← Previous
-      </Link>
+    <Pagination>
+      <PaginationContent>
+        <PaginationItem>
+          <PaginationPrevious
+            href={currentPage === 1 ? "#" : buildQuery(currentPage - 1)}
+            aria-disabled={currentPage === 1}
+            className={
+              currentPage === 1 ? "pointer-events-none opacity-50" : undefined
+            }
+          />
+        </PaginationItem>
 
-      <span className="text-sm">
-        Page {currentPage} of {totalPages}
-      </span>
+        {getPageNumbers().map((pageNum, idx) => (
+          <PaginationItem key={idx}>
+            {pageNum === "ellipsis" ? (
+              <PaginationEllipsis />
+            ) : (
+              <PaginationLink
+                href={buildQuery(pageNum)}
+                isActive={pageNum === currentPage}
+              >
+                {pageNum}
+              </PaginationLink>
+            )}
+          </PaginationItem>
+        ))}
 
-      <Link
-        href={buildQuery(currentPage + 1)}
-        className={
-          currentPage === totalPages
-            ? "pointer-events-none opacity-50"
-            : "hover:underline"
-        }
-      >
-        Next →
-      </Link>
-    </div>
+        <PaginationItem>
+          <PaginationNext
+            href={
+              currentPage === totalPages ? "#" : buildQuery(currentPage + 1)
+            }
+            aria-disabled={currentPage === totalPages}
+            className={
+              currentPage === totalPages
+                ? "pointer-events-none opacity-50"
+                : undefined
+            }
+          />
+        </PaginationItem>
+      </PaginationContent>
+    </Pagination>
   );
 }

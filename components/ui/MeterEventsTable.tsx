@@ -17,6 +17,7 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Command,
   CommandInput,
@@ -41,8 +42,22 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronDown, Filter, Calendar as CalendarIcon, X } from "lucide-react";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  ChevronDown,
+  Filter,
+  Calendar as CalendarIcon,
+  X,
+  RefreshCw,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 
@@ -73,6 +88,9 @@ interface MeterEventsTableProps {
     endTime: string;
     detectionTypes: string[];
   };
+  currentPage: number;
+  totalPages: number;
+  searchParams: any;
 }
 
 function epochToDateTime(ts: number): string {
@@ -251,9 +269,12 @@ function DetectionCell({ data, title }: { data: any[]; title: string }) {
 export default function MeterEventsTable({
   data,
   initialFilters,
+  currentPage,
+  totalPages,
+  searchParams,
 }: MeterEventsTableProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParamsHook = useSearchParams();
 
   const [selectedTypes, setSelectedTypes] = useState<DetectionType[]>(
     initialFilters.detectionTypes as DetectionType[]
@@ -266,15 +287,17 @@ export default function MeterEventsTable({
     detectionTypes: initialFilters.detectionTypes as DetectionType[],
   });
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const hasActiveFilters =
     initialFilters.deviceId ||
     initialFilters.date ||
     initialFilters.startTime ||
-    initialFilters.endTime;
+    initialFilters.endTime ||
+    initialFilters.detectionTypes.length > 0;
 
   const updateURL = (filters: EventFilters) => {
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParamsHook.toString());
 
     // Reset to page 1 when filters change
     params.set("page", "1");
@@ -312,6 +335,13 @@ export default function MeterEventsTable({
     router.push(`?${params.toString()}`);
   };
 
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    router.refresh();
+    // Reset the refreshing state after a short delay
+    setTimeout(() => setIsRefreshing(false), 1000);
+  };
+
   const applyFilters = () => {
     updateURL(tempFilters);
     setFilterDialogOpen(false);
@@ -336,249 +366,393 @@ export default function MeterEventsTable({
     updateURL(newFilters);
   };
 
-  if (!data.length) {
-    return <div className="text-sm text-gray-500">No events found.</div>;
-  }
+  // Build query for pagination
+  const buildPaginationQuery = (newPage: number) => {
+    const params = new URLSearchParams();
+    params.set("page", newPage.toString());
+
+    if (searchParams.deviceId) params.set("deviceId", searchParams.deviceId);
+    if (searchParams.date) params.set("date", searchParams.date);
+    if (searchParams.startTime) params.set("startTime", searchParams.startTime);
+    if (searchParams.endTime) params.set("endTime", searchParams.endTime);
+    if (searchParams.detectionTypes)
+      params.set("detectionTypes", searchParams.detectionTypes);
+
+    return `?${params.toString()}`;
+  };
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const pages: (number | "ellipsis")[] = [];
+    const showEllipsisStart = currentPage > 3;
+    const showEllipsisEnd = currentPage < totalPages - 2;
+
+    // Always show first page
+    pages.push(1);
+
+    // Show ellipsis or page 2
+    if (showEllipsisStart) {
+      pages.push("ellipsis");
+    } else if (totalPages > 1) {
+      pages.push(2);
+    }
+
+    // Show pages around current page
+    for (
+      let i = Math.max(2, currentPage - 1);
+      i <= Math.min(totalPages - 1, currentPage + 1);
+      i++
+    ) {
+      if (!pages.includes(i)) {
+        pages.push(i);
+      }
+    }
+
+    // Show ellipsis or second-to-last page
+    if (showEllipsisEnd) {
+      pages.push("ellipsis");
+    } else if (totalPages > 2 && !pages.includes(totalPages - 1)) {
+      pages.push(totalPages - 1);
+    }
+
+    // Always show last page
+    if (totalPages > 1 && !pages.includes(totalPages)) {
+      pages.push(totalPages);
+    }
+
+    return pages;
+  };
 
   return (
     <div className="space-y-3 w-full">
-      {/* FILTER BAR */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <DetectionTypeFilter
-          selectedTypes={selectedTypes}
-          onChange={handleDetectionTypeChange}
-        />
+      {/* TOP BAR WITH FILTERS, PAGINATION, AND REFRESH */}
+      <div className="flex items-center justify-between gap-4">
+        {/* LEFT SIDE - FILTERS */}
+        <div className="flex items-center gap-3 flex-wrap flex-1">
+          <DetectionTypeFilter
+            selectedTypes={selectedTypes}
+            onChange={handleDetectionTypeChange}
+          />
 
-        <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex items-center gap-1"
-            >
-              <Filter className="h-4 w-4" />
-              Filter Events
-              {hasActiveFilters && (
-                <span className="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded-full">
-                  •
-                </span>
-              )}
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Filter Events</DialogTitle>
-            </DialogHeader>
+          <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1"
+              >
+                <Filter className="h-4 w-4" />
+                Filter Events
+                {hasActiveFilters && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded-full">
+                    •
+                  </span>
+                )}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Filter Events</DialogTitle>
+              </DialogHeader>
 
-            <div className="space-y-4 py-4">
-              {/* Device ID Filter */}
-              <div className="space-y-2">
-                <Label htmlFor="deviceId">Device ID</Label>
-                <Input
-                  id="deviceId"
-                  placeholder="Enter device ID..."
-                  value={tempFilters.deviceId}
-                  onChange={(e) =>
-                    setTempFilters({ ...tempFilters, deviceId: e.target.value })
-                  }
-                />
-              </div>
+              <div className="space-y-4 py-4">
+                {/* Device ID Filter */}
+                <div className="space-y-2">
+                  <Label htmlFor="deviceId">Device ID</Label>
+                  <Input
+                    id="deviceId"
+                    placeholder="Enter device ID..."
+                    value={tempFilters.deviceId}
+                    onChange={(e) =>
+                      setTempFilters({
+                        ...tempFilters,
+                        deviceId: e.target.value,
+                      })
+                    }
+                  />
+                </div>
 
-              {/* Date Picker */}
-              <div className="space-y-2">
-                <Label>Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !tempFilters.date && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {tempFilters.date ? (
-                        format(new Date(tempFilters.date), "PPP")
-                      ) : (
-                        <span>Pick a date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={
-                        tempFilters.date
-                          ? new Date(tempFilters.date)
-                          : undefined
-                      }
-                      onSelect={(date: any) =>
+                {/* Date Picker */}
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !tempFilters.date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {tempFilters.date ? (
+                          format(new Date(tempFilters.date), "PPP")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={
+                          tempFilters.date
+                            ? new Date(tempFilters.date)
+                            : undefined
+                        }
+                        onSelect={(date: any) =>
+                          setTempFilters({
+                            ...tempFilters,
+                            date: date ? format(date, "yyyy-MM-dd") : "",
+                          })
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Time Range */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="startTime">Start Time</Label>
+                    <Input
+                      id="startTime"
+                      type="time"
+                      value={tempFilters.startTime}
+                      onChange={(e) =>
                         setTempFilters({
                           ...tempFilters,
-                          date: date ? format(date, "yyyy-MM-dd") : "",
+                          startTime: e.target.value,
                         })
                       }
-                      initialFocus
                     />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Time Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="startTime">Start Time</Label>
-                  <Input
-                    id="startTime"
-                    type="time"
-                    value={tempFilters.startTime}
-                    onChange={(e) =>
-                      setTempFilters({
-                        ...tempFilters,
-                        startTime: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endTime">End Time</Label>
-                  <Input
-                    id="endTime"
-                    type="time"
-                    value={tempFilters.endTime}
-                    onChange={(e) =>
-                      setTempFilters({
-                        ...tempFilters,
-                        endTime: e.target.value,
-                      })
-                    }
-                  />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endTime">End Time</Label>
+                    <Input
+                      id="endTime"
+                      type="time"
+                      value={tempFilters.endTime}
+                      onChange={(e) =>
+                        setTempFilters({
+                          ...tempFilters,
+                          endTime: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={clearFilters}>
-                Clear All
-              </Button>
-              <Button onClick={applyFilters}>Apply Filters</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear All
+                </Button>
+                <Button onClick={applyFilters}>Apply Filters</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
-        {selectedTypes.length > 0 && (
-          <span className="text-xs text-gray-600">
-            Detection types: {selectedTypes.join(", ")}
-          </span>
-        )}
+          {selectedTypes.length > 0 && (
+            <span className="text-xs text-gray-600">
+              Detection types: {selectedTypes.join(", ")}
+            </span>
+          )}
 
-        {hasActiveFilters && (
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="h-8 px-2"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear filters
+            </Button>
+          )}
+        </div>
+
+        {/* RIGHT SIDE - PAGINATION AND REFRESH */}
+        <div className="flex items-center gap-2">
+          {totalPages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href={
+                      currentPage === 1
+                        ? "#"
+                        : buildPaginationQuery(currentPage - 1)
+                    }
+                    aria-disabled={currentPage === 1}
+                    className={
+                      currentPage === 1
+                        ? "pointer-events-none opacity-50"
+                        : undefined
+                    }
+                  />
+                </PaginationItem>
+
+                {getPageNumbers().map((pageNum, idx) => (
+                  <PaginationItem key={idx}>
+                    {pageNum === "ellipsis" ? (
+                      <PaginationEllipsis />
+                    ) : (
+                      <PaginationLink
+                        href={buildPaginationQuery(pageNum)}
+                        isActive={pageNum === currentPage}
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    )}
+                  </PaginationItem>
+                ))}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href={
+                      currentPage === totalPages
+                        ? "#"
+                        : buildPaginationQuery(currentPage + 1)
+                    }
+                    aria-disabled={currentPage === totalPages}
+                    className={
+                      currentPage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : undefined
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            onClick={clearFilters}
-            className="h-8 px-2"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-1"
           >
-            <X className="h-4 w-4 mr-1" />
-            Clear event filters
+            <RefreshCw
+              className={cn("h-4 w-4", isRefreshing && "animate-spin")}
+            />
+            Refresh
           </Button>
-        )}
+        </div>
       </div>
 
-      {/* Results count - now shows actual filtered count from server */}
-      <div className="text-sm text-gray-600">Showing {data.length} events</div>
+      {/* Results count */}
+      <div className="text-sm text-gray-600">
+        {data.length === 0
+          ? "No events found"
+          : `Showing ${data.length} events`}
+      </div>
 
-      {/* FULL-WIDTH TABLE */}
-      <Table className="w-full">
-        <TableHeader>
-          <TableRow className="text-sm">
-            <TableHead className="w-[120px]">Device ID</TableHead>
-            <TableHead className="w-[160px]">Timestamp</TableHead>
-            <TableHead className="w-[100px]">Status</TableHead>
-            <TableHead className="w-[180px]">OCR</TableHead>
-            <TableHead className="w-[180px]">Faces</TableHead>
-            <TableHead className="w-[180px]">TV Channel</TableHead>
-            <TableHead className="w-[200px]">Object Detection</TableHead>
-            <TableHead className="w-[220px]">Content Detection</TableHead>
-            <TableHead className="w-[240px]">Image</TableHead>
-          </TableRow>
-        </TableHeader>
+      {/* SHADCN TABLE WITH SCROLLABLE CONTAINER */}
+      {data.length > 0 ? (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[120px]">Device ID</TableHead>
+                <TableHead className="w-[160px]">Timestamp</TableHead>
+                <TableHead className="w-[100px]">Status</TableHead>
+                <TableHead className="w-[180px]">OCR</TableHead>
+                <TableHead className="w-[180px]">Faces</TableHead>
+                <TableHead className="w-[180px]">TV Channel</TableHead>
+                <TableHead className="w-[200px]">Object Detection</TableHead>
+                <TableHead className="w-[220px]">Content Detection</TableHead>
+                <TableHead className="w-[240px]">Image</TableHead>
+              </TableRow>
+            </TableHeader>
 
-        <TableBody>
-          {data.map((event, idx) => (
-            <TableRow key={idx} className="text-sm align-top">
-              <TableCell className="pr-4">{event.deviceId}</TableCell>
-              <TableCell className="pr-4 whitespace-nowrap">
-                {epochToDateTime(event.timestamp)}
-              </TableCell>
-              <TableCell className="pr-4">{event.status}</TableCell>
+            <TableBody>
+              {data.map((event, idx) => (
+                <TableRow key={idx} className="align-top">
+                  <TableCell className="font-medium">
+                    {event.deviceId}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {epochToDateTime(event.timestamp)}
+                  </TableCell>
+                  <TableCell>{event.status}</TableCell>
 
-              {/* Detection Columns with Hover Cards */}
-              <TableCell className="pr-4 align-top">
-                <DetectionCell
-                  data={event.detections.OCR}
-                  title="OCR Detection"
-                />
-              </TableCell>
-              <TableCell className="pr-4 align-top">
-                <DetectionCell
-                  data={event.detections.faces}
-                  title="Face Detection"
-                />
-              </TableCell>
-              <TableCell className="pr-4 align-top">
-                <DetectionCell
-                  data={event.detections.tv_channel}
-                  title="TV Channel Detection"
-                />
-              </TableCell>
-              <TableCell className="pr-4 align-top">
-                <DetectionCell
-                  data={event.detections.object_detection}
-                  title="Object Detection"
-                />
-              </TableCell>
-              <TableCell className="pr-4 align-top">
-                <DetectionCell
-                  data={event.detections.content_detection}
-                  title="Content Detection"
-                />
-              </TableCell>
+                  {/* Detection Columns with Hover Cards */}
+                  <TableCell className="align-top">
+                    <DetectionCell
+                      data={event.detections.OCR}
+                      title="OCR Detection"
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <DetectionCell
+                      data={event.detections.faces}
+                      title="Face Detection"
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <DetectionCell
+                      data={event.detections.tv_channel}
+                      title="TV Channel Detection"
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <DetectionCell
+                      data={event.detections.object_detection}
+                      title="Object Detection"
+                    />
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <DetectionCell
+                      data={event.detections.content_detection}
+                      title="Content Detection"
+                    />
+                  </TableCell>
 
-              {/* IMAGE COLUMN */}
-              <TableCell className="pr-4">
-                {event.processedS3Key ? (
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <button className="border rounded overflow-hidden h-26 w-26">
-                        <img
-                          src={event.processedS3Key}
-                          alt="processed"
-                          className="h-full w-full object-cover"
-                        />
-                      </button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl">
-                      <DialogHeader>
-                        <DialogTitle>Processed Image</DialogTitle>
-                      </DialogHeader>
-                      <div className="w-full flex justify-center">
-                        <img
-                          src={event.processedS3Key}
-                          alt="processed-full"
-                          className="max-h-[80vh] w-auto object-contain rounded border"
-                        />
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                ) : (
-                  <span className="text-xs text-gray-400">No image</span>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+                  {/* IMAGE COLUMN */}
+                  <TableCell>
+                    {event.processedS3Key ? (
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <button className="border rounded overflow-hidden h-26 w-26 hover:opacity-80 transition-opacity">
+                            <img
+                              src={event.processedS3Key}
+                              alt="processed"
+                              className="h-full w-full object-cover"
+                            />
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl">
+                          <DialogHeader>
+                            <DialogTitle>Processed Image</DialogTitle>
+                          </DialogHeader>
+                          <div className="w-full flex justify-center">
+                            <img
+                              src={event.processedS3Key}
+                              alt="processed-full"
+                              className="max-h-[80vh] w-auto object-contain rounded border"
+                            />
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        No image
+                      </span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <div className="rounded-md border p-8 text-center text-muted-foreground">
+          No events found matching the current filters.
+        </div>
+      )}
     </div>
   );
 }

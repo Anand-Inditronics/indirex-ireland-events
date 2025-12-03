@@ -40,42 +40,73 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto p-6">
-      <h2 className="text-2xl font-semibold mb-4">Sign in</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
+      <div className="w-full max-w-md">
+        {/* Card */}
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-8">
+          <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">
+            Welcome back
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                Email address
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="mt-1"
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                Password
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="mt-1"
+                placeholder="••••••••"
+              />
+            </div>
+
+            {error && (
+              <div className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-md border border-red-200">
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full outline py-2.5"
+            >
+              {loading ? "Signing in..." : "Sign in"}
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-gray-600">
+            Don’t have an account?{" "}
+            <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500 underline">
+              Sign up
+            </Link>
+          </p>
         </div>
-        <div>
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
-
-        <Button type="submit" disabled={loading}>
-          {loading ? "Signing in..." : "Sign in"}
-        </Button>
-      </form>
-
-      <p className="mt-4 text-sm">
-        New here?{" "}
-        <Link href="/register" className="underline">
-          Create an account
-        </Link>
-      </p>
+        {/* Optional subtle branding/footer */}
+        <p className="mt-8 text-center text-xs text-gray-500">
+          © 2025 Your App Name. All rights reserved.
+        </p>
+      </div>
     </div>
   );
 }

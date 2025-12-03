@@ -1,8 +1,7 @@
 // app/layout.tsx
-import "./globals.css";
+import "../globals.css";
 import AppLayout from "@/components/ui/app-layout-sidebar";
-import { Providers } from "./providers";
-
+import { Providers } from "../providers";
 
 export default function RootLayout({
   children,

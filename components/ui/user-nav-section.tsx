@@ -21,7 +21,7 @@ export function UserNavSection({ className = "" }: { className?: string }) {
           </span>
         </div>
         <Button
-          variant="outline"
+          variant="destructive"
           size="sm"
           className="justify-start"
           onClick={() => signOut({ callbackUrl: "/signin" })}
@@ -36,7 +36,7 @@ export function UserNavSection({ className = "" }: { className?: string }) {
   return (
     <div className={`flex flex-col gap-3 ${className}`}>
       <Link href="/signin">
-        <Button variant="ghost" size="sm" className="w-full justify-start">
+        <Button size="sm" className="w-full justify-center">
           Sign in
         </Button>
       </Link>
