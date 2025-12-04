@@ -288,6 +288,20 @@ export default function MeterEventsTable({
   });
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+
+  // Auto-refresh effect - refreshes every 30 seconds
+  React.useEffect(() => {
+    if (!autoRefreshEnabled) return;
+
+    const intervalId = setInterval(() => {
+      setIsRefreshing(true);
+      router.refresh();
+      setTimeout(() => setIsRefreshing(false), 1000);
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, [autoRefreshEnabled, router]);
 
   const hasActiveFilters =
     initialFilters.deviceId ||
@@ -639,6 +653,16 @@ export default function MeterEventsTable({
               className={cn("h-4 w-4", isRefreshing && "animate-spin")}
             />
             Refresh
+          </Button>
+
+          <Button
+            variant={autoRefreshEnabled ? "default" : "outline"}
+            size="sm"
+            onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+            className="flex items-center gap-1"
+          >
+            <RefreshCw className={cn("h-4 w-4")} />
+            Auto {autoRefreshEnabled ? "ON" : "OFF"}
           </Button>
         </div>
       </div>
