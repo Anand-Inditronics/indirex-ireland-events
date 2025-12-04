@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { Menu } from "lucide-react";
+import { AudioLines } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -45,7 +46,19 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <SidebarMenu className="bg-gray-200">
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link href="/audio-events">
+                <AudioLines className="h-4 w-4" />
+                <span>Audio Events</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarContent>
+
+      
 
       <SidebarFooter>
         <div className="p-3">

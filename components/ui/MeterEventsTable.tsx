@@ -60,6 +60,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import ExportCSVButton from "./ExportCSVButton";
 
 const DETECTION_TYPES = [
   "OCR",
@@ -585,6 +586,11 @@ export default function MeterEventsTable({
               Clear filters
             </Button>
           )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* existing pagination / refresh buttons */}
+          <ExportCSVButton></ExportCSVButton> {/* ← NEW BUTTON */}
         </div>
 
         {/* RIGHT SIDE - PAGINATION AND REFRESH */}
