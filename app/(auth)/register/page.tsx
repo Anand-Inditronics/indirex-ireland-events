@@ -146,11 +146,6 @@ export default function RegisterPage() {
             </Link>
           </p>
         </div>
-
-        {/* Optional footer */}
-        <p className="mt-8 text-center text-xs text-gray-500">
-          By creating an account, you agree to our Terms and Privacy Policy.
-        </p>
       </div>
     </div>
   );

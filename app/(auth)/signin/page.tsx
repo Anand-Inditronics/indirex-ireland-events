@@ -101,11 +101,6 @@ export default function SignInPage() {
             </Link>
           </p>
         </div>
-
-        {/* Optional subtle branding/footer */}
-        <p className="mt-8 text-center text-xs text-gray-500">
-          © 2025 Your App Name. All rights reserved.
-        </p>
       </div>
     </div>
   );
