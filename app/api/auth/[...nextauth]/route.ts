@@ -57,7 +57,7 @@ export const authOptions: NextAuthOptions = {
     signIn: "/signin",
   },
 
-  secret: process.env.NEXTAUTH_SECRET_TEST,
+  secret: process.env.NEXTAUTH_SECRET,
 };
 
 // ✅ REQUIRED in App Router (fix)
