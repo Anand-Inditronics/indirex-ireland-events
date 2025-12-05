@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, ScanCommand } from "@aws-sdk/lib-dynamodb";
 
-const TABLE = process.env.AUDIO_EVENTS_TABLE || process.env.DYNAMODB_TABLE;
+const TABLE = process.env.AUDIO_EVENTS_TABLE_TEST || process.env.DYNAMODB_TABLE;
 const REGION = process.env.AWS_REGION || "us-east-1";
 // Safety cap to avoid infinite memory growth / huge Dynamo costs.
 // Set to "0" to disable cap (not recommended).

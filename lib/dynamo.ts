@@ -8,13 +8,13 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 
 const client = new DynamoDBClient({
-  region: process.env.AWS_REGION || "ap-south-1",
-  endpoint: process.env.DYNAMODB_ENDPOINT || undefined,
+  region: process.env.AWS_REGION_TEST || "ap-south-1",
+  endpoint: process.env.DYNAMODB_ENDPOINT_TEST || undefined,
   credentials:
-    process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+    process.env.AWS_ACCESS_KEY_ID_TEST && process.env.AWS_SECRET_ACCESS_KEY_TEST
       ? {
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID_TEST,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY_TEST,
         }
       : undefined,
 });
