@@ -110,109 +110,47 @@ function epochToDateTime(ts: number): string {
   return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
-function renderDetectionItems(arr: any[], type?: string): React.ReactNode {
-  if (!arr || !arr.length) return null;
-
-  const itemsToShow = arr.slice(0, 3);
-
-  return (
-    <div className="space-y-1 text-xs">
-      {itemsToShow.map((item, idx) => {
-        // Special handling for content_detection
-        if (type === "content_detection" && item && typeof item === "object") {
-          const { time, ...rest } = item; // Remove time
-          if (Object.keys(rest).length === 0) return null;
-
-          return (
-            <div key={idx} className="space-y-0.5">
-              {Object.entries(rest).map(([key, value]) => (
-                <div key={key} className="truncate">
-                  <span className="font-medium">{key}:</span>{" "}
-                  <span>
-                    {typeof value === "number" ? value.toFixed(4) : String(value)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          );
-        }
-
-        // Default rendering for other types
-        if (typeof item === "string" || typeof item === "number" || typeof item === "boolean") {
-          return <div key={idx} className="truncate">{String(item)}</div>;
-        }
-
-        if (Array.isArray(item)) {
-          return <div key={idx} className="truncate">{JSON.stringify(item)}</div>;
-        }
-
-        if (item && typeof item === "object") {
-          const entries = Object.entries(item).slice(0, 4);
-          return (
-            <div key={idx} className="space-y-0.5">
-              {entries.map(([key, value]) => {
-                const displayValue = Array.isArray(value) || (value && typeof value === "object")
-                  ? JSON.stringify(value)
-                  : String(value);
-
-                return (
-                  <div key={key} className="truncate">
-                    <span className="font-medium">{key}:</span> {displayValue}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        }
-
-        return <div key={idx} className="truncate">{JSON.stringify(item)}</div>;
-      })}
-
-      {arr.length > itemsToShow.length && (
-        <div className="text-[10px] text-gray-500">
-          +{arr.length - itemsToShow.length} more…
-        </div>
-      )}
-    </div>
-  );
-}
-
-function renderAllDetectionItems(arr: any[], type?: string): React.ReactNode {
+function renderAllDetectionItems(arr: any[]): React.ReactNode {
   if (!arr || !arr.length)
     return <div className="text-xs text-gray-500">No data</div>;
 
   return (
     <div className="space-y-2 text-xs max-h-[400px] overflow-y-auto">
       {arr.map((item, idx) => {
-        // Special handling: hide `time` in content_detection
-        if (type === "content_detection" && item && typeof item === "object") {
-          const { time, ...rest } = item;
-          if (Object.keys(rest).length === 0) return null;
-
+        if (
+          typeof item === "string" ||
+          typeof item === "number" ||
+          typeof item === "boolean"
+        ) {
           return (
-            <div key={idx} className="p-2 bg-gray-50 rounded border space-y-1">
-              {Object.entries(rest).map(([key, value]) => (
-                <div key={key}>
-                  <span className="font-semibold text-gray-700">{key}:</span>{" "}
-                  <span className="text-gray-600">
-                    {typeof value === "number" ? value.toFixed(4) : String(value)}
-                  </span>
-                </div>
-              ))}
+            <div key={idx} className="p-2 bg-gray-50 rounded border">
+              {String(item)}
             </div>
           );
         }
 
-        // Default object rendering
-        if (item && typeof item === "object" && !Array.isArray(item)) {
+        if (Array.isArray(item)) {
+          return (
+            <div key={idx} className="p-2 bg-gray-50 rounded border">
+              {JSON.stringify(item, null, 2)}
+            </div>
+          );
+        }
+
+        if (item && typeof item === "object") {
           const entries = Object.entries(item);
           return (
             <div key={idx} className="p-2 bg-gray-50 rounded border space-y-1">
               {entries.map(([key, value]) => {
-                const displayValue =
-                  Array.isArray(value) || (value && typeof value === "object")
-                    ? JSON.stringify(value)
-                    : String(value);
+                let displayValue: string;
+
+                if (Array.isArray(value)) {
+                  displayValue = JSON.stringify(value);
+                } else if (value && typeof value === "object") {
+                  displayValue = JSON.stringify(value);
+                } else {
+                  displayValue = String(value);
+                }
 
                 return (
                   <div key={key}>
@@ -225,7 +163,6 @@ function renderAllDetectionItems(arr: any[], type?: string): React.ReactNode {
           );
         }
 
-        // Fallback
         return (
           <div key={idx} className="p-2 bg-gray-50 rounded border">
             {JSON.stringify(item)}
@@ -236,22 +173,84 @@ function renderAllDetectionItems(arr: any[], type?: string): React.ReactNode {
   );
 }
 
-function DetectionCell({
-  data,
-  title,
-  type, // new optional prop
-}: {
-  data: any[];
-  title: string;
-  type?: string;
-}) {
+function renderDetectionItems(arr: any[]): React.ReactNode {
+  if (!arr || !arr.length) return null;
+
+  const itemsToShow = arr.slice(0, 3);
+
+  return (
+    <div className="space-y-1 text-xs">
+      {itemsToShow.map((item, idx) => {
+        if (
+          typeof item === "string" ||
+          typeof item === "number" ||
+          typeof item === "boolean"
+        ) {
+          return (
+            <div key={idx} className="truncate">
+              {String(item)}
+            </div>
+          );
+        }
+
+        if (Array.isArray(item)) {
+          return (
+            <div key={idx} className="truncate">
+              {JSON.stringify(item)}
+            </div>
+          );
+        }
+
+        if (item && typeof item === "object") {
+          const entries = Object.entries(item).slice(0, 4);
+          return (
+            <div key={idx} className="space-y-0.5">
+              {entries.map(([key, value]) => {
+                let displayValue: string;
+
+                if (Array.isArray(value)) {
+                  displayValue = JSON.stringify(value);
+                } else if (value && typeof value === "object") {
+                  displayValue = JSON.stringify(value);
+                } else {
+                  displayValue = String(value);
+                }
+
+                return (
+                  <div key={key} className="truncate">
+                    <span className="font-medium">{key}:</span>{" "}
+                    <span>{displayValue}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        }
+
+        return (
+          <div key={idx} className="truncate">
+            {JSON.stringify(item)}
+          </div>
+        );
+      })}
+
+      {arr.length > itemsToShow.length && (
+        <div className="text-[10px] text-gray-500">
+          +{arr.length - itemsToShow.length} more…
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetectionCell({ data, title }: { data: any[]; title: string }) {
   if (!data || !data.length) return null;
 
   return (
     <HoverCard>
       <HoverCardTrigger asChild>
         <div className="cursor-pointer hover:bg-gray-50 transition-colors rounded p-1">
-          {renderDetectionItems(data, type)}
+          {renderDetectionItems(data)}
         </div>
       </HoverCardTrigger>
       <HoverCardContent
@@ -261,7 +260,7 @@ function DetectionCell({
       >
         <div className="space-y-2">
           <h4 className="font-semibold text-sm">{title}</h4>
-          {renderAllDetectionItems(data, type)}
+          {renderAllDetectionItems(data)}
         </div>
       </HoverCardContent>
     </HoverCard>
@@ -739,7 +738,6 @@ export default function MeterEventsTable({
                     <DetectionCell
                       data={event.detections.content_detection}
                       title="Content Detection"
-                      type="content_detection" // ← Add this prop
                     />
                   </TableCell>
 
